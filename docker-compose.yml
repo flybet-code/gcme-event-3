@@ -7,7 +7,7 @@ services:
       - POSTGRES_PASSWORD=mypassword
       - POSTGRES_DB=cls_db_org
     ports:
-      - "5438:5432"
+      - "5440:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -22,7 +22,7 @@ services:
         - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
         - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
     ports:
-      - "3001:3000" # External 3001 -> Internal 3000
+      - "3003:3000" # External 3003 -> Internal 3000
     environment:
       - NODE_ENV=production
       - BETTER_AUTH_URL=${BETTER_AUTH_URL}
