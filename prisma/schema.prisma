@@ -1,0 +1,592 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Legacy fixed registration (Phase 9: deprecate after cutover) ---
+
+model Registration {
+  id                   Int        @id @default(autoincrement())
+  title                String?
+  fullName             String
+  churchName           String
+  serviceRole          String
+  phoneNumber          String
+  email                String?
+  receiptPath          String?
+  amount               String
+  paymentStatus        String     @default("pending")
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  isGroup              Boolean    @default(false)
+  checkedIn            Boolean    @default(false)
+  checkedInAt          DateTime?
+  couponCode           String?
+  discountApplied      String?
+  activities           Json?
+  paymentType          String     @default("TELEBIRR")
+  transactionReference String?
+  deletedAt            DateTime?
+  ticketNumber         Int?
+  vendorId             String?
+  vendor               Vendor?    @relation(fields: [vendorId], references: [id])
+  groupId              String?
+  group                Group?     @relation(fields: [groupId], references: [id])
+  isBadgePrinted       Boolean    @default(false)
+  badgePrintedAt       DateTime?
+  /// Scoped tenant; backfilled from vendor/group/default org
+  organizationId       String?
+  organization         Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  /// Summit flow: /org/{orgSlug}/{eventSlug}/register
+  eventId              String?
+  event                Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  attendees            Attendee[]
+  responses            Json?
+
+  @@index([organizationId])
+  @@index([organizationId, eventId])
+}
+
+model Attendee {
+  id               Int          @id @default(autoincrement())
+  registrationId   Int
+  title            String?
+  fullName         String
+  role             String
+  amount           String
+  phoneNumber      String?
+  checkedIn        Boolean      @default(false)
+  checkedInAt      DateTime?
+  activities       Json?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  ticketNumber     Int?
+  vendorId         String?
+  vendor           Vendor?      @relation(fields: [vendorId], references: [id])
+  groupId          String?
+  isBadgePrinted   Boolean      @default(false)
+  badgePrintedAt   DateTime?
+  group            Group?       @relation(fields: [groupId], references: [id])
+  registration     Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  responses        Json?
+}
+
+// --- Platform user (better-auth) ---
+
+model User {
+  id                     String    @id @default(cuid())
+  name                   String?
+  email                  String    @unique
+  emailVerified          Boolean   @default(false)
+  image                  String?
+  isPlatformSuperAdmin   Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  roleId                 String?
+  accounts               Account[]
+  sessions               Session[]
+  role                   Role?     @relation(fields: [roleId], references: [id])
+  organizationMembers    OrganizationMember[]
+  ownedOrganizations     Organization[]         @relation("OrganizationOwner")
+  activeOrganizationPref UserActiveOrganization?
+  platformFeedbacks      PlatformFeedback[]
+}
+
+enum PlatformEaseRating {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model PlatformFeedback {
+  id              String             @id @default(cuid())
+  userId          String
+  campaignId      String?
+  organizationId  String?
+  eventId         String?
+  easeRating      PlatformEaseRating
+  recommendScore  Int
+  additionalText  String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign     PlatformFeedbackCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  organization Organization?             @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  event        Event?                    @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@unique([userId])
+  @@index([createdAt])
+  @@index([campaignId])
+  @@index([organizationId, eventId])
+}
+
+/// Super-admin schedule for when the feedback popup is shown to org/event members.
+model PlatformFeedbackCampaign {
+  id                String    @id @default(cuid())
+  organizationId    String
+  eventId           String?
+  isActive          Boolean   @default(false)
+  autoShowOnLogin   Boolean   @default(true)
+  /// When eventId is set, only show after event.endsAt (if true).
+  requireEventEnded Boolean   @default(true)
+  visibleFrom       DateTime?
+  visibleUntil      DateTime?
+  title             String?
+  createdByUserId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  event          Event?       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  feedbacks      PlatformFeedback[]
+  dismissals     PlatformFeedbackPromptDismissal[]
+
+  @@index([organizationId, isActive])
+  @@index([eventId])
+}
+
+model PlatformFeedbackPromptDismissal {
+  id           String   @id @default(cuid())
+  userId       String
+  campaignId   String
+  dismissUntil DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  campaign PlatformFeedbackCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, campaignId])
+}
+
+model UserActiveOrganization {
+  userId         String   @id
+  organizationId String
+  updatedAt      DateTime @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  users       User[]
+  permissions Permission[] @relation("PermissionToRole")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  roles       Role[]   @relation("PermissionToRole")
+}
+
+model Invitation {
+  id        String   @id @default(cuid())
+  email     String
+  roleId    String
+  /// When true, accepting grants isPlatformSuperAdmin (only these invites may be created by platform super admins)
+  grantPlatformSuperAdmin Boolean @default(false)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// --- Multi-tenancy ---
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  ownerId   String
+  owner     User     @relation("OrganizationOwner", fields: [ownerId], references: [id])
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members                OrganizationMember[]
+  invitations            OrganizationInvitation[]
+  events                 Event[]
+  forms                  Form[]
+  groups                 Group[]
+  vendors                Vendor[]
+  batches                Batch[]
+  formResponses          FormResponse[]
+  eventRegistrations     EventRegistration[]
+  userActivePreferences  UserActiveOrganization[]
+  registrations          Registration[]
+  emailTemplates         OrganizationEmailTemplate[]
+  emailSentLogs          OrganizationEmailSent[]
+  feedbackCampaigns      PlatformFeedbackCampaign[]
+  platformFeedbacks      PlatformFeedback[]
+}
+
+/// Reusable compose presets and sent-mail archive (per org / optional event).
+model OrganizationEmailTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  eventId        String?
+  createdById    String?
+  title          String
+  subject        String
+  cc             String   @default("")
+  bodyText       String   @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  event          Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  sentLogs       OrganizationEmailSent[]
+
+  @@index([organizationId])
+  @@index([organizationId, eventId])
+}
+
+model OrganizationEmailSent {
+  id             String   @id @default(cuid())
+  organizationId String
+  eventId        String?
+  templateId     String?
+  sentById       String
+  title          String
+  subject        String
+  toEmails       String[]
+  ccEmails       String[]
+  bodyText       String   @db.Text
+  recipientCount Int
+  createdAt      DateTime @default(now())
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  event          Event?                    @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  template       OrganizationEmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+}
+
+model OrganizationMember {
+  id               String   @id @default(cuid())
+  organizationId   String
+  userId           String
+  role             OrgRole
+  permissions      String[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model OrganizationInvitation {
+  id               String   @id @default(cuid())
+  organizationId   String
+  email            String
+  role             OrgRole
+  permissions      String[]
+  token            String   @unique
+  expiresAt        DateTime
+  used             Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, email])
+}
+
+// --- Events & dynamic forms ---
+
+model Event {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  name                 String
+  slug                 String
+  description          String?
+  startsAt             DateTime?
+  endsAt               DateTime?
+  registrationFormId   String?
+  registrationForm     Form?     @relation("EventRegistrationForm", fields: [registrationFormId], references: [id])
+  settings             Json?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  forms        Form[]         @relation("EventForms")
+
+  registrations       EventRegistration[]
+  legacyRegistrations Registration[]
+  emailTemplates      OrganizationEmailTemplate[]
+  emailSentLogs       OrganizationEmailSent[]
+  feedbackCampaigns   PlatformFeedbackCampaign[]
+  platformFeedbacks   PlatformFeedback[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model Form {
+  id                String   @id @default(cuid())
+  organizationId    String
+  eventId           String?
+  name              String
+  isActive          Boolean  @default(true)
+  defaultLocale     String   @default("en")
+  supportedLocales  String[]
+  i18nMeta          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  event        Event?       @relation("EventForms", fields: [eventId], references: [id], onDelete: SetNull)
+  eventsAsRegistration Event[] @relation("EventRegistrationForm")
+
+  fields    FormField[]
+  responses FormResponse[]
+}
+
+model FormField {
+  id         String        @id @default(cuid())
+  formId     String
+  fieldKey   String
+  label      String
+  labelI18n  Json?
+  type       FormFieldType
+  required   Boolean       @default(false)
+  order      Int           @default(0)
+  options    Json?
+  validation Json?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  form Form @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, fieldKey])
+  @@index([formId, order])
+}
+
+enum FormFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  EMAIL
+  PHONE
+  SELECT
+  RADIO
+  CHECKBOX
+  MULTI_SELECT
+  DATE
+  DATETIME
+  FILE
+  HIDDEN
+}
+
+model FormResponse {
+  id                  String   @id @default(cuid())
+  formId              String
+  organizationId      String
+  eventId             String?
+  responses           Json
+  submittedByUserId   String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  form         Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  primaryForRegistration EventRegistration? @relation("PrimaryResponse")
+  attendeeRows           EventAttendee[]
+
+  @@index([organizationId, formId])
+  @@index([organizationId, eventId])
+}
+
+model EventRegistration {
+  id                     String    @id @default(cuid())
+  organizationId       String
+  eventId                String
+  primaryResponseId      String    @unique
+  primaryResponse        FormResponse @relation("PrimaryResponse", fields: [primaryResponseId], references: [id])
+
+  isGroup                Boolean   @default(false)
+  paymentStatus          String    @default("pending")
+  paymentType            String?
+  transactionReference   String?
+  amount                 String?
+  receiptPath            String?
+  couponCode             String?
+  discountApplied        String?
+  deletedAt              DateTime?
+
+  ticketNumber           Int?
+  vendorId               String?
+  groupId                String?
+
+  checkedIn              Boolean   @default(false)
+  checkedInAt            DateTime?
+  isBadgePrinted         Boolean   @default(false)
+  badgePrintedAt         DateTime?
+
+  qrPayload              String?   @unique
+  activities             Json?
+
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  vendor       Vendor?      @relation(fields: [vendorId], references: [id])
+  group        Group?       @relation(fields: [groupId], references: [id])
+  attendees    EventAttendee[]
+
+  @@index([organizationId, eventId])
+  @@index([paymentStatus])
+}
+
+model EventAttendee {
+  id                    String   @id @default(cuid())
+  eventRegistrationId   String
+  formResponseId        String   @unique
+  ticketNumber          Int?
+  checkedIn             Boolean  @default(false)
+  checkedInAt           DateTime?
+  isBadgePrinted        Boolean  @default(false)
+  badgePrintedAt        DateTime?
+  vendorId              String?
+  groupId               String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  eventRegistration EventRegistration @relation(fields: [eventRegistrationId], references: [id], onDelete: Cascade)
+  formResponse      FormResponse      @relation(fields: [formResponseId], references: [id], onDelete: Restrict)
+  vendor            Vendor?           @relation(fields: [vendorId], references: [id])
+  group             Group?            @relation(fields: [groupId], references: [id])
+
+  @@index([eventRegistrationId])
+}
+
+// --- Scoped operational entities ---
+
+model Batch {
+  id                  String   @id @default(cuid())
+  /// Set on all rows after seed; required for new APIs
+  organizationId      String?
+  name                String
+  prefix              Int
+  roles               String[]
+  paymentStatuses     String[]
+  coupons             String[]
+  registrationIds     Int[]
+  eventRegistrationIds String[] @default([])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model Group {
+  id                   String         @id @default(cuid())
+  organizationId       String?
+  name                 String
+  description          String?
+  roles                String[]
+  paymentStatuses      String[]
+  coupons              String[]
+  registrationIds      Int[]
+  eventRegistrationIds String[]       @default([])
+  vendorId             String?
+  vendor               Vendor?        @relation(fields: [vendorId], references: [id])
+  registrations        Registration[]
+  attendees            Attendee[]
+  eventRegistrations   EventRegistration[]
+  eventAttendees       EventAttendee[]
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model Vendor {
+  id                 String         @id @default(cuid())
+  organizationId     String?
+  name               String
+  capacity           Int
+  registrations      Registration[]
+  attendees          Attendee[]
+  groups             Group[]
+  eventRegistrations EventRegistration[]
+  eventAttendees     EventAttendee[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}

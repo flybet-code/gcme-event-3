@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+      - POSTGRES_DB=cls_db_org
+    ports:
+      - "5438:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  cls-event:
+    image: ${DOCKER_IMAGE:-cls-event}
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+        - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+    ports:
+      - "3001:3000" # External 3001 -> Internal 3000
+    environment:
+      - NODE_ENV=production
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - PAYMENT_GATEWAY_URL=${PAYMENT_GATEWAY_URL}
+      - PAYMENT_GATEWAY_TOKEN_SUMMIT=${PAYMENT_GATEWAY_TOKEN_SUMMIT}
+      - DATABASE_URL=${DOCKER_DATABASE_URL}
+      - TELEBIRR_GATEWAY_TOKEN=${TELEBIRR_GATEWAY_TOKEN}
+      - TELEBIRR_RETRIEVE_URL=${TELEBIRR_RETRIEVE_URL}
+      - TELEBIRR_STATUS_URL=${TELEBIRR_STATUS_URL}
+      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EVENT_NAME=${EVENT_NAME}
+      - EVENT_DATE=${EVENT_DATE}
+      - EVENT_LOCATION=${EVENT_LOCATION}
+      - EVENT_CITY=${EVENT_CITY}
+      - EVENT_YEAR=${EVENT_YEAR}
+      - FROM_NAME=${FROM_NAME}
+    depends_on:
+      - db
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+
+volumes:
+  postgres_data:
