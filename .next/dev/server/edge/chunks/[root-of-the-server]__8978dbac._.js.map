@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 16, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/src/middleware.ts"],"sourcesContent":["import { NextResponse } from 'next/server';\nimport type { NextRequest } from 'next/server';\n\nexport function middleware(_request: NextRequest) {\n    return NextResponse.next();\n}\n\nexport const config = {\n    matcher: ['/:orgSlug((?!api|_next|static|favicon.ico|uploads).*)/:path*', '/api/orgs/:path*', '/api/events/:path*', '/api/forms/:path*', '/api/register', '/api/public/:path*'],\n};\n"],"names":[],"mappings":";;;;;;AAAA;AAAA;;AAGO,SAAS,WAAW,QAAqB;IAC5C,OAAO,gMAAY,CAAC,IAAI;AAC5B;AAEO,MAAM,SAAS;IAClB,SAAS;QAAC;QAAgE;QAAoB;QAAsB;QAAqB;QAAiB;KAAqB;AACnL"}}]
+}
