@@ -1,0 +1,26 @@
+[
+  {
+    "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?(?:\\/((?!api|_next|static|favicon.ico|uploads).*))(?:\\/((?:[^\\/#\\?]+?)(?:\\/(?:[^\\/#\\?]+?))*))?(\\\\.json)?[\\/#\\?]?$",
+    "originalSource": "/:orgSlug((?!api|_next|static|favicon.ico|uploads).*)/:path*"
+  },
+  {
+    "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/api\\/orgs(?:\\/((?:[^\\/#\\?]+?)(?:\\/(?:[^\\/#\\?]+?))*))?(\\\\.json)?[\\/#\\?]?$",
+    "originalSource": "/api/orgs/:path*"
+  },
+  {
+    "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/api\\/events(?:\\/((?:[^\\/#\\?]+?)(?:\\/(?:[^\\/#\\?]+?))*))?(\\\\.json)?[\\/#\\?]?$",
+    "originalSource": "/api/events/:path*"
+  },
+  {
+    "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/api\\/forms(?:\\/((?:[^\\/#\\?]+?)(?:\\/(?:[^\\/#\\?]+?))*))?(\\\\.json)?[\\/#\\?]?$",
+    "originalSource": "/api/forms/:path*"
+  },
+  {
+    "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/api\\/register(\\\\.json)?[\\/#\\?]?$",
+    "originalSource": "/api/register"
+  },
+  {
+    "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/api\\/public(?:\\/((?:[^\\/#\\?]+?)(?:\\/(?:[^\\/#\\?]+?))*))?(\\\\.json)?[\\/#\\?]?$",
+    "originalSource": "/api/public/:path*"
+  }
+]
